@@ -7,6 +7,7 @@ import subprocess
 import numpy as np
 import os.path as osp
 from munch import munchify
+from torch.nn import init
 
 import audio
 from stylesync_model import FullGenerator
@@ -18,32 +19,48 @@ def requires_grad(model, flag=True):
 
 
 def load_model(path):
-    with open(osp.join(osp.dirname(path), 'args.json')) as f:
-        model_args = munchify(json.load(f))
-    assert not model_args.gpen_norm
-    generator = create_generator(model_args)
-    print("Load checkpoint from: {}".format(path))
-    checkpoint = torch.load(path, map_location='cpu')
-    s = checkpoint["state_dict"]
-    new_s = {}
-    for k, v in s.items():
-        new_s[k.replace('module.', '')] = v
-    model = generator
-    model.load_state_dict(new_s)
-    return model
+    # with open(osp.join(osp.dirname(path), 'args.json')) as f:
+    #     model_args = munchify(json.load(f))
+    # assert not model_args.gpen_norm
+    generator = create_generator(None)
+    # print("Load checkpoint from: {}".format(path))
+    # checkpoint = torch.load(path, map_location='cpu')
+    # s = checkpoint["state_dict"]
+    # new_s = {}
+    # for k, v in s.items():
+    #     new_s[k.replace('module.', '')] = v
+    # model = generator
+    # model.load_state_dict(new_s)
+    for m in generator.modules():
+        if isinstance(m, (torch.nn.Conv2d, torch.nn.Linear)):
+            init.normal_(m.weight, mean=0.0, std=0.02)
+        elif isinstance(m, torch.nn.BatchNorm2d):
+            init.normal_(m.weight, mean=1.0, std=0.02)
+            init.constant_(m.bias, 0)
+
+    return generator
 
 
 def create_generator(args):
-    generator = FullGenerator(args.size,
-                              args.latent,
-                              args.n_mlp,
-                              channel_multiplier=args.channel_multiplier,
-                              narrow=args.narrow,
-                              device=args.device,
-                              mask_p=args.mask_p,
-                              mask_n_noise=args.mask_n_noise,
-                              face_z=getattr(args, 'face_z', False),
-                              noise_mask_p=getattr(args, 'noise_mask_p', None)).to(args.device)
+    if args:
+        generator = FullGenerator(args.size,
+                                args.latent,
+                                args.n_mlp,
+                                channel_multiplier=args.channel_multiplier,
+                                narrow=args.narrow,
+                                device=args.device,
+                                mask_p=args.mask_p,
+                                mask_n_noise=args.mask_n_noise,
+                                face_z=getattr(args, 'face_z', False),
+                                noise_mask_p=getattr(args, 'noise_mask_p', None)).to(args.device)
+    else:
+        generator = FullGenerator(1024,
+                                512,
+                                8,
+                                channel_multiplier=2,
+                                device="cuda",
+                                face_z=getattr(args, 'face_z', False),
+                                noise_mask_p=getattr(args, 'noise_mask_p', None)).to("cuda")
     return generator
 
 

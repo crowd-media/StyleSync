@@ -13,7 +13,7 @@ from tqdm import tqdm
 from glob import glob
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--checkpoint_path', type=str, required=True)
+parser.add_argument('--checkpoint_path', type=str, required=False)
 parser.add_argument('--face', type=str, required=True)
 parser.add_argument('--audio', type=str, required=True)
 parser.add_argument('--max_mel_chunks', type=int, default=None)
